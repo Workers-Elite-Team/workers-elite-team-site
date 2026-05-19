@@ -1,0 +1,50 @@
+{
+  "heroImages": [
+    {
+      "id": "hi-1778654988877",
+      "photoKey": "hi-1778654988877",
+      "src": "/editor-front/Muse%20New.png",
+      "xPct": 53.8663,
+      "yPct": 26.9585,
+      "widthPct": 21.1919,
+      "rotation": 0,
+      "zIndex": 10
+    },
+    {
+      "id": "hi-1778655037045",
+      "photoKey": "hi-1778655037045",
+      "src": "/editor-front/Ganze%20Png%20Dort.png",
+      "xPct": 22.9361,
+      "yPct": 23.1274,
+      "widthPct": 23.7791,
+      "rotation": 0,
+      "zIndex": 6
+    },
+    {
+      "id": "hi-1778655058648",
+      "photoKey": "hi-1778655058648",
+      "src": "/editor-front/Re%20Sct.png",
+      "xPct": 18.343,
+      "yPct": 44.316,
+      "widthPct": 12.6744,
+      "rotation": 0,
+      "zIndex": 7
+    },
+    {
+      "id": "hi-1778655093129",
+      "photoKey": "hi-1778655093129",
+      "src": "/editor-front/Wigo%20Sct.png",
+      "xPct": 67.7325,
+      "yPct": 41.8921,
+      "widthPct": 16.7151,
+      "rotation": 0,
+      "zIndex": 8
+    }
+  ],
+  "guides": [
+    { "id": "guide-1", "title": "Kewl Tune", "image": "uploads/Kewl%20Tune.png", "metafyLink": "#" },
+    { "id": "guide-2", "title": "Doomz", "image": "uploads/Doomz.jpg", "metafyLink": "#" },
+    { "id": "guide-3", "title": "Sky Striker", "image": "uploads/Sky%20Striker.png", "metafyLink": "#" },
+    { "id": "guide-4", "title": "Mitsurugi", "image": "uploads/Mitsurugi.png", "metafyLink": "#" }
+  ]
+}

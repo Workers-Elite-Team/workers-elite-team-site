@@ -1,0 +1,12 @@
+node_modules/
+.vercel/
+uploads/
+orders.db
+stuff.txt
+cert.pem
+key.pem
+npm
+*.pem
+
+.vercel
+.env*.local

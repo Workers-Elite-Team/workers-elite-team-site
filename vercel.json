@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "content.json",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "uploads/**",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "Editor Front/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/get-photos",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/save-photo",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/get-content",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/save-content",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/editor-front/(.*)",
+      "dest": "/Editor Front/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
