@@ -38,6 +38,78 @@ app.post(['/api/login', '/login'], (req, res) => {
   }
 });
 
+// ── CONTENT.JSON SHARED HELPERS ─────────────────────────────────────────────
+let _blobCache = null, _blobCacheTime = 0;
+let _contentServerCache = null, _contentServerCacheTime = 0;
+let _contentBlobUrl = null;
+const CONTENT_CACHE_TTL_MS = 20000; // 20s — fetch(downloadUrl) è gratuito, non consuma Advanced Requests
+
+// Legge content.json: cache in-memory -> blob (env-resolved URL, list() solo come ultima risorsa) -> file locale -> {}
+async function getContentData() {
+  const now = Date.now();
+  if (_contentServerCache && now - _contentServerCacheTime < CONTENT_CACHE_TTL_MS) {
+    return _contentServerCache;
+  }
+  try {
+    let blobUrl = _contentBlobUrl || process.env.BLOB_CONTENT_URL || null;
+    if (!blobUrl && process.env.BLOB_STORE_BASE_URL) {
+      blobUrl = `${process.env.BLOB_STORE_BASE_URL}/content.json`;
+    }
+    if (!blobUrl) {
+      const { blobs } = await list({ prefix: 'content.json' });
+      const contentBlob = blobs.find(b => b.pathname === 'content.json');
+      if (contentBlob) blobUrl = contentBlob.downloadUrl;
+    }
+    if (blobUrl) {
+      const response = await fetch(blobUrl);
+      const data = await response.json();
+      _contentBlobUrl = blobUrl;
+      _contentServerCache = data; _contentServerCacheTime = Date.now();
+      return data;
+    }
+  } catch (blobErr) {
+    // blob non disponibile → fallback al file locale
+  }
+  const localPath = path.join(process.cwd(), 'content.json');
+  if (fs.existsSync(localPath)) {
+    const data = JSON.parse(fs.readFileSync(localPath, 'utf8'));
+    _contentServerCache = data; _contentServerCacheTime = Date.now();
+    return data;
+  }
+  return {};
+}
+
+function invalidateContentCache() {
+  _contentServerCache = null;
+  _contentServerCacheTime = 0;
+  _contentBlobUrl = null;
+}
+
+async function saveContentData(data) {
+  const buffer = Buffer.from(JSON.stringify(data));
+  const blob = await put('content.json', buffer, {
+    access: 'public',
+    contentType: 'application/json',
+    addRandomSuffix: false
+  });
+  invalidateContentCache();
+  return blob;
+}
+
+// Serializza le scritture sul manifest memberPhotos entro la stessa istanza warm
+let _manifestQueue = Promise.resolve();
+function updateMemberPhotoManifest(key, timestamp) {
+  const run = async () => {
+    const data = await getContentData();
+    const next = Object.assign({}, data);
+    next.memberPhotos = Object.assign({}, data.memberPhotos || {}, { [key]: timestamp });
+    await saveContentData(next);
+  };
+  const result = _manifestQueue.then(run, run);
+  _manifestQueue = result.catch(() => {});
+  return result;
+}
+
 // Salvataggio foto (PROTETTO)
 app.post(['/api/save-photo', '/save-photo'], authenticate, async (req, res) => {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -53,7 +125,13 @@ app.post(['/api/save-photo', '/save-photo'], authenticate, async (req, res) => {
       contentType: 'image/jpeg',
       addRandomSuffix: false
     });
-    res.json({ success: true, url: blob.url });
+    const version = Date.now();
+    try {
+      await updateMemberPhotoManifest(memberId, version);
+    } catch (manifestErr) {
+      console.error('Error updating memberPhotos manifest:', manifestErr);
+    }
+    res.json({ success: true, url: `${blob.url}?v=${version}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -81,9 +159,6 @@ app.post(['/api/save-guide-photo', '/save-guide-photo'], authenticate, async (re
   }
 });
 
-let _blobCache = null, _blobCacheTime = 0;
-let _contentServerCache = null, _contentServerCacheTime = 0;
-
 app.get(['/api/get-photos', '/get-photos'], async (req, res) => {
   try {
     const photos = {};
@@ -101,23 +176,33 @@ app.get(['/api/get-photos', '/get-photos'], async (req, res) => {
       photos[id] = `uploads/${f}`; // Senza slash iniziale per flessibilità
     });
 
-    // Foto salvate su Vercel Blob (hanno la precedenza) — cache 60s
+    // Foto salvate su Vercel Blob (hanno la precedenza) — manifest in content.json, nessuna list() nel percorso caldo
     try {
-      const now = Date.now();
-      if (!_blobCache || now - _blobCacheTime > 60000) {
-        const { blobs } = await list({ prefix: 'members/' });
-        _blobCache = blobs;
-        _blobCacheTime = now;
+      const storeBase = process.env.BLOB_STORE_BASE_URL;
+      if (storeBase) {
+        const data = await getContentData();
+        const memberPhotos = data.memberPhotos || {};
+        Object.keys(memberPhotos).forEach(key => {
+          photos[key] = `${storeBase}/members/${key}.jpg?v=${memberPhotos[key]}`;
+        });
+      } else {
+        const now = Date.now();
+        if (!_blobCache || now - _blobCacheTime > 21600000) {
+          const { blobs } = await list({ prefix: 'members/' });
+          _blobCache = blobs;
+          _blobCacheTime = now;
+        }
+        _blobCache.forEach(blob => {
+          const id = blob.pathname.replace('members/', '').replace('.jpg', '');
+          const version = blob.uploadedAt ? new Date(blob.uploadedAt).getTime() : _blobCacheTime;
+          photos[id] = `${blob.url}?v=${version}`;
+        });
       }
-      _blobCache.forEach(blob => {
-        const id = blob.pathname.replace('members/', '').replace('.jpg', '');
-        photos[id] = blob.url;
-      });
     } catch(err) {
       console.error('Error fetching from blob:', err);
     }
     
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'public, max-age=20, stale-while-revalidate=20');
     res.json(photos);
   } catch (err) {
     res.json({});
@@ -127,15 +212,12 @@ app.get(['/api/get-photos', '/get-photos'], async (req, res) => {
 // Salvataggio contenuto (PROTETTO)
 app.post(['/api/save-content', '/save-content'], authenticate, async (req, res) => {
   try {
-    const data = req.body;
-    const buffer = Buffer.from(JSON.stringify(data));
-    const blob = await put('content.json', buffer, {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false
-    });
-    _contentServerCache = null;
-    _contentServerCacheTime = 0;
+    const incoming = req.body || {};
+    const current = await getContentData();
+    // memberPhotos è gestito solo da /api/save-photo: un salvataggio di
+    // contenuto (guide/hero) non deve mai sovrascriverlo con uno snapshot obsoleto.
+    const merged = Object.assign({}, incoming, { memberPhotos: current.memberPhotos || incoming.memberPhotos || {} });
+    const blob = await saveContentData(merged);
     res.json({ success: true, url: blob.url });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -144,36 +226,9 @@ app.post(['/api/save-content', '/save-content'], authenticate, async (req, res) 
 
 app.get(['/api/get-content', '/get-content'], async (req, res) => {
   try {
-    const now = Date.now();
-    if (_contentServerCache && now - _contentServerCacheTime < 60000) {
-      res.setHeader('Cache-Control', 'no-cache');
-      return res.json(_contentServerCache);
-    }
-    // 1. Vercel Blob (ha precedenza — aggiornato a runtime dal save-content)
-    try {
-      const { blobs } = await list({ prefix: 'content.json' });
-      const contentBlob = blobs.find(b => b.pathname === 'content.json');
-      if (contentBlob) {
-        const response = await fetch(contentBlob.downloadUrl);
-        const data = await response.json();
-        _contentServerCache = data; _contentServerCacheTime = Date.now();
-        res.setHeader('Cache-Control', 'no-cache');
-        return res.json(data);
-      }
-    } catch(blobErr) {
-      // blob non disponibile → fallback al file locale
-    }
-
-    // 2. File locale (deploy statico o sviluppo locale senza Blob)
-    const localPath = path.join(process.cwd(), 'content.json');
-    if (fs.existsSync(localPath)) {
-      const data = JSON.parse(fs.readFileSync(localPath, 'utf8'));
-      _contentServerCache = data; _contentServerCacheTime = Date.now();
-      res.setHeader('Cache-Control', 'no-cache');
-      return res.json(data);
-    }
-
-    res.json({});
+    const data = await getContentData();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.json(data);
   } catch (err) {
     res.json({});
   }

@@ -95,7 +95,7 @@ nav {
 @keyframes bounce { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(8px); } }
 .hero-ornament span { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; }
 /* -- HERO IMAGES (free-position) -- */
-#hero-canvas { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: min(100%, calc(100vh * 16 / 9)); height: 100%; pointer-events: none; z-index: 2; }
+#hero-canvas { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, calc(100vh * 16 / 9)); height: min(100%, calc(100vw * 9 / 16)); pointer-events: none; z-index: 2; }
 .hero-img-wrapper { position: absolute; cursor: default; user-select: none; touch-action: none; z-index: 10; pointer-events: none; }
 .hero-img-wrapper img { width: 100%; height: auto; display: block; border-radius: 4px; pointer-events: none; }
 .hero-img-handle { display: none; position: absolute; width: 14px; height: 14px; background: #c9a84c; border-radius: 50%; z-index: 20; }
@@ -134,8 +134,8 @@ section { position: relative; z-index: 1; }
   background-size: 120% auto;
 }
 #members > * { position: relative; z-index: 1; }
-.members-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.5rem; max-width: 1300px; margin: 0 auto; }
-.member-card { background: var(--black2); border: 1px solid var(--border); padding: 2rem 1.5rem; text-align: center; position: relative; transition: all 0.3s; overflow: hidden; }
+.members-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; max-width: 1300px; margin: 0 auto; }
+.member-card { background: var(--black2); border: 1px solid var(--border); padding: 2rem 1.5rem; text-align: center; position: relative; transition: all 0.3s; overflow: hidden; flex: 0 0 calc((100% - 5 * 1.5rem) / 6); }
 .member-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); transform: scaleX(0); transition: transform 0.4s; }
 .member-card:hover { border-color: var(--border-bright); transform: translateY(-4px); }
 .member-card:hover::before { transform: scaleX(1); }
@@ -162,7 +162,8 @@ section { position: relative; z-index: 1; }
 .btn-guide { display: inline-block; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 16px; background: var(--gold); color: var(--black); border: none; text-decoration: none; cursor: pointer; transition: all 0.2s; text-align: center; white-space: normal; line-height: 1.4; }
 .btn-guide:hover { background: var(--gold-light); transform: translateY(-1px); }
 .guide-langs { position: absolute; top: 0.6rem; right: 0.6rem; z-index: 3; display: flex; gap: 3px; pointer-events: none; }
-.guide-lang-flag { font-size: 1.6rem; line-height: 1; }
+.guide-lang-flag { display: inline-flex; line-height: 1; }
+.guide-lang-flag svg { width: 1.6rem; height: 1.1rem; display: block; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,0.15); }
 .social-links { display: flex; justify-content: center; gap: 1.2rem; flex-wrap: wrap; margin: 2rem auto 0; }
 .social-link  { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; color: var(--text-dim); text-decoration: none; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; transition: color 0.3s; }
 .social-link svg { width: 36px; height: 36px; fill: currentColor; }
@@ -421,7 +422,8 @@ footer { background: var(--black2); border-top: 1px solid var(--border); padding
   .guide-card { height: 300px; }
 
   /* MEMBERS GRID */
-  .members-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+  .members-grid { gap: 1rem; }
+  .member-card { flex: 0 0 calc((100% - 3 * 1rem) / 4); }
 
   /* PLANS */
   .plans-grid { grid-template-columns: 1fr; gap: 1.5rem; }
@@ -462,8 +464,8 @@ footer { background: var(--black2); border-top: 1px solid var(--border); padding
   .hero-desc { font-size: 0.82rem; }
 
   /* MEMBERS GRID — 2 colonne fisse su mobile piccolo */
-  .members-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-  .member-card { padding: 1.2rem 0.8rem; }
+  .members-grid { gap: 0.75rem; }
+  .member-card { padding: 1.2rem 0.8rem; flex: 0 0 calc((100% - 0.75rem) / 2); }
   .member-avatar { width: 56px; height: 56px; font-size: 1.1rem; }
   .member-name { font-size: 0.72rem; }
   .member-role { font-size: 0.55rem; }
@@ -833,6 +835,7 @@ const membersData = {
       ],
       birth: '14/02/1997', photo: null
     },
+    { id: 'NM', initials: 'NM', name: 'Nuovo Membro', role: 'Pro Player', tops: [], birth: '', photo: null },
   ]
 };
 
@@ -997,13 +1000,15 @@ var DEFAULT_GUIDES = [
   { id: 'guide-3', title: 'Sky Striker', image: 'uploads/Sky%20Striker.webp', metafyLink: '#' },
   { id: 'guide-4', title: 'Mitsurugi', image: 'uploads/Mitsurugi.webp', metafyLink: '#' }
 ];
+var FLAG_SVG_IT = '<svg viewBox="0 0 3 2" xmlns="http://www.w3.org/2000/svg"><rect width="1" height="2" fill="#008C45"/><rect x="1" width="1" height="2" fill="#F4F5F0"/><rect x="2" width="1" height="2" fill="#CD212A"/></svg>';
+var FLAG_SVG_GB = '<svg viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#FFFFFF" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#C8102E" stroke-width="2"/><path d="M30,0 V30 M0,15 H60" stroke="#FFFFFF" stroke-width="10"/><path d="M30,0 V30 M0,15 H60" stroke="#C8102E" stroke-width="6"/></svg>';
 function renderGuideCards(guides) {
   var grid = document.getElementById('guide-grid');
   if (!grid) return;
   grid.innerHTML = guides.map(function(g) {
     var imgUrl = g.image.startsWith('http') ? g.image : g.image.replace(/\.png$/i, '.webp');
     return '<div class="guide-card" data-guide-id="' + g.id + '" style="background-image:url(\'' + imgUrl + '\')">' +
-      (g.langs && g.langs.length ? '<div class="guide-langs">' + g.langs.map(function(l){return '<span class="guide-lang-flag">'+(l==='it'?'🇮🇹':'🇬🇧')+'</span>';}).join('') + '</div>' : '') +
+      (g.langs && g.langs.length ? '<div class="guide-langs">' + g.langs.map(function(l){return '<span class="guide-lang-flag">'+(l==='it'?FLAG_SVG_IT:FLAG_SVG_GB)+'</span>';}).join('') + '</div>' : '') +
       '<div class="guide-card-content">' +
       '<div class="guide-card-title">' + g.title + '</div>' +
       '<a href="' + (g.metafyLink || '#') + '" class="btn-guide" target="_blank" rel="noopener">' + t('guide_read_metafy') + '</a>' +
