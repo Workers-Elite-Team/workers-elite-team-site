@@ -62,7 +62,7 @@
         body: JSON.stringify(await getMemberDataMap())
       });
       if (res.ok) {
-        showToast('Modifiche salvate con successo');
+        showToast('Modifiche salvate con successo. Saranno disponibili tra qualche minuto.');
         renderMembers();
         closeMemberEdit();
       }
@@ -96,11 +96,50 @@
     });
   };
 
+  window.injectMemberAvatarOverlay = function() {
+    const allMembers = [...membersData.founders, ...membersData.players];
+    allMembers.forEach(m => {
+      const avatarEl = document.getElementById('avatar-' + m.id);
+      if (avatarEl && !avatarEl.querySelector('.avatar-upload-btn')) {
+        const uploadBtn = document.createElement('div');
+        uploadBtn.className = 'avatar-upload-btn';
+        uploadBtn.innerHTML = '📷';
+        uploadBtn.title = 'Cambia foto';
+        uploadBtn.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);color:#fff;font-size:1.3rem;opacity:0;transition:opacity 0.2s;cursor:pointer;z-index:50;';
+        uploadBtn.onmouseover = () => { uploadBtn.style.opacity = '1'; };
+        uploadBtn.onmouseout = () => { uploadBtn.style.opacity = '0'; };
+        uploadBtn.onclick = (e) => {
+          e.stopPropagation();
+          window._currentAvatarMemberId = m.id;
+          document.getElementById('avatarFileInput').click();
+        };
+        avatarEl.appendChild(uploadBtn);
+      }
+    });
+
+    const fileInput = document.getElementById('avatarFileInput');
+    if (fileInput && !fileInput._wired) {
+      fileInput._wired = true;
+      fileInput.onchange = function() {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          window._cropSourceDataUrl = e.target.result;
+          openCropModalForMember();
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = '';
+      };
+    }
+  };
+
   // Override render
   const originalRenderMembers = window.renderMembers;
   window.renderMembers = function() {
     if (originalRenderMembers) originalRenderMembers();
     setTimeout(injectAdminButtons, 100);
+    setTimeout(injectMemberAvatarOverlay, 100);
   };
 
   // Logout button
@@ -215,10 +254,11 @@
       var token = localStorage.getItem('wet_admin_token');
       if (imgUrl && imgUrl.includes('blob.vercel-storage.com')) {
         try {
+          var cleanUrl = imgUrl.split('?')[0];
           await fetch('/api/delete-blob', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ url: imgUrl })
+            body: JSON.stringify({ url: cleanUrl })
           });
         } catch(err) {}
       }
@@ -327,13 +367,159 @@
         if (status) status.textContent = 'Errore: ' + (errData.error || res.status);
         return;
       }
-      if (status) status.textContent = 'Salvato!';
+      if (status) status.textContent = 'Salvato! Disponibile tra qualche minuto.';
       heroEditorRefreshInteractive();
-      setTimeout(function() { if (status) status.textContent = ''; }, 2000);
+      setTimeout(function() { if (status) status.textContent = ''; }, 4000);
     } catch(e) {
       if (status) status.textContent = 'Errore salvataggio';
     }
   };
+  // ── MEMBER AVATAR/CROP EDITOR ───────────────────────────────────────────────
+  window._cropState = {
+    avatar: { zoom: 1, x: 0, y: 0 },
+    hero:   { zoom: 1, x: 0, y: 0 }
+  };
+  window._cropTab = 'avatar';
+
+  function applyCropTransform() {
+    const img = document.getElementById('cropImg');
+    const viewport = document.getElementById('cropViewport');
+    const st = window._cropState[window._cropTab];
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    const natW = img.naturalWidth || 1, natH = img.naturalHeight || 1;
+    const coverScale = Math.max(vw / natW, vh / natH) * st.zoom;
+    const dispW = natW * coverScale, dispH = natH * coverScale;
+    img.style.width = dispW + 'px';
+    img.style.height = dispH + 'px';
+    img.style.left = ((vw - dispW) / 2 + st.x) + 'px';
+    img.style.top = ((vh - dispH) / 2 + st.y) + 'px';
+  }
+
+  function wireCropDrag() {
+    const viewport = document.getElementById('cropViewport');
+    if (viewport._dragWired) return;
+    viewport._dragWired = true;
+    let dragging = false, sx, sy, sX0, sY0;
+    viewport.addEventListener('mousedown', function(e) {
+      dragging = true; viewport.classList.add('dragging');
+      sx = e.clientX; sy = e.clientY;
+      const st = window._cropState[window._cropTab];
+      sX0 = st.x; sY0 = st.y;
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      const st = window._cropState[window._cropTab];
+      st.x = sX0 + (e.clientX - sx);
+      st.y = sY0 + (e.clientY - sy);
+      applyCropTransform();
+    });
+    document.addEventListener('mouseup', function() {
+      dragging = false; viewport.classList.remove('dragging');
+    });
+  }
+
+  window.openCropModalForMember = function() {
+    window._cropTab = 'avatar';
+    window._cropState = { avatar: { zoom: 1, x: 0, y: 0 }, hero: { zoom: 1, x: 0, y: 0 } };
+    const img = document.getElementById('cropImg');
+    img.src = window._cropSourceDataUrl;
+    img.onload = function() { applyCropTransform(); };
+    document.getElementById('tabAvatar').classList.add('active');
+    document.getElementById('tabHero').classList.remove('active');
+    document.getElementById('cropViewport').classList.add('avatar-mode');
+    document.getElementById('cropCircleOverlay').style.display = '';
+    document.getElementById('cropZoom').value = 1;
+    document.getElementById('cropModal').classList.add('open');
+    wireCropDrag();
+  };
+
+  window.switchCropTab = function(tab) {
+    window._cropTab = tab;
+    document.getElementById('tabAvatar').classList.toggle('active', tab === 'avatar');
+    document.getElementById('tabHero').classList.toggle('active', tab === 'hero');
+    document.getElementById('cropViewport').classList.toggle('avatar-mode', tab === 'avatar');
+    document.getElementById('cropCircleOverlay').style.display = tab === 'avatar' ? '' : 'none';
+    document.getElementById('cropSubtitle').textContent = tab === 'avatar'
+      ? 'Trascina per centrare il volto nell\'avatar circolare'
+      : 'Trascina per posizionare il banner esteso';
+    document.getElementById('cropZoom').value = window._cropState[tab].zoom;
+    applyCropTransform();
+  };
+
+  window.onZoomChange = function() {
+    window._cropState[window._cropTab].zoom = parseFloat(document.getElementById('cropZoom').value);
+    applyCropTransform();
+  };
+
+  window.cancelCrop = function() {
+    document.getElementById('cropModal').classList.remove('open');
+    window._cropSourceDataUrl = null;
+  };
+
+  function extractCropDataUrl(tab, outW, outH) {
+    const img = document.getElementById('cropImg');
+    const viewport = document.getElementById('cropViewport');
+    const st = window._cropState[tab];
+    const natW = img.naturalWidth, natH = img.naturalHeight;
+    const wasAvatarMode = viewport.classList.contains('avatar-mode');
+    viewport.classList.toggle('avatar-mode', tab === 'avatar');
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    viewport.classList.toggle('avatar-mode', wasAvatarMode);
+    const coverScale = Math.max(vw / natW, vh / natH) * st.zoom;
+    const dispW = natW * coverScale, dispH = natH * coverScale;
+    const left = (vw - dispW) / 2 + st.x;
+    const top = (vh - dispH) / 2 + st.y;
+    const canvas = document.createElement('canvas');
+    canvas.width = outW; canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    const scaleX = outW / vw, scaleY = outH / vh;
+    ctx.drawImage(img, left * scaleX, top * scaleY, dispW * scaleX, dispH * scaleY);
+    return canvas.toDataURL('image/jpeg', 0.9);
+  }
+
+  window.confirmCrop = async function() {
+    const memberId = window._currentAvatarMemberId;
+    if (!memberId) { cancelCrop(); return; }
+    const token = localStorage.getItem('wet_admin_token');
+    try {
+      const avatarDataUrl = extractCropDataUrl('avatar', 400, 400);
+      const heroDataUrl = extractCropDataUrl('hero', 1000, 450);
+
+      // Sequenziali, non Promise.all: save-photo fa una read-modify-write sul
+      // manifest memberPhotos di content.json — due chiamate in parallelo per
+      // lo stesso membro rischierebbero di perdersi a vicenda l'aggiornamento.
+      const avatarRes = await fetch('/api/save-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ memberId: memberId + '-avatar', dataUrl: avatarDataUrl })
+      });
+      const avatarData = await avatarRes.json();
+
+      const heroRes = await fetch('/api/save-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ memberId: memberId, dataUrl: heroDataUrl })
+      });
+      const heroData = await heroRes.json();
+
+      if (!avatarRes.ok || !avatarData.url || !heroRes.ok || !heroData.url) {
+        const errMsg = avatarData.error || heroData.error || 'errore sconosciuto';
+        showToast('Errore upload foto: ' + errMsg);
+        return;
+      }
+
+      const m = [...membersData.founders, ...membersData.players].find(x => x.id === memberId);
+      if (m) { m.photoAvatar = avatarData.url; m.photo = heroData.url; }
+
+      showToast('Foto aggiornata con successo. Sarà disponibile tra qualche minuto.');
+      renderMembers();
+      document.getElementById('cropModal').classList.remove('open');
+      window._cropSourceDataUrl = null;
+    } catch (e) {
+      showToast('Errore durante il caricamento della foto');
+    }
+  };
+
   // ── GUIDE EDITOR ──────────────────────────────────────────────────────────
   function injectGuideModal() {
     if (document.getElementById('guideCreateModal')) return;
@@ -360,8 +546,8 @@
         '<div style="margin-bottom:1.5rem">' +
           '<label style="display:block;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.6rem">Lingua</label>' +
           '<div style="display:flex;gap:0.8rem">' +
-            '<button type="button" id="flagBtnIT" onclick="window.toggleGuideLang(\'it\')" title="Italiano" style="font-size:1.8rem;background:none;border:2px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;opacity:0.35;transition:opacity 0.2s,border-color 0.2s">🇮🇹</button>' +
-            '<button type="button" id="flagBtnEN" onclick="window.toggleGuideLang(\'en\')" title="English" style="font-size:1.8rem;background:none;border:2px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;opacity:0.35;transition:opacity 0.2s,border-color 0.2s">🇬🇧</button>' +
+            '<button type="button" id="flagBtnIT" onclick="window.toggleGuideLang(\'it\')" title="Italiano" style="background:none;border:2px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;opacity:0.35;transition:opacity 0.2s,border-color 0.2s"><svg viewBox="0 0 3 2" width="28.8" height="19.2" xmlns="http://www.w3.org/2000/svg" style="display:block;border-radius:2px"><rect width="1" height="2" fill="#008C45"/><rect x="1" width="1" height="2" fill="#F4F5F0"/><rect x="2" width="1" height="2" fill="#CD212A"/></svg></button>' +
+            '<button type="button" id="flagBtnEN" onclick="window.toggleGuideLang(\'en\')" title="English" style="background:none;border:2px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;opacity:0.35;transition:opacity 0.2s,border-color 0.2s"><svg viewBox="0 0 60 30" width="36.5" height="18.2" xmlns="http://www.w3.org/2000/svg" style="display:block;border-radius:2px"><rect width="60" height="30" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#FFFFFF" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#C8102E" stroke-width="2"/><path d="M30,0 V30 M0,15 H60" stroke="#FFFFFF" stroke-width="10"/><path d="M30,0 V30 M0,15 H60" stroke="#C8102E" stroke-width="6"/></svg></button>' +
           '</div>' +
         '</div>' +
         '<div id="guideCreateStatus" style="font-size:0.75rem;color:var(--gold);margin-bottom:1rem;min-height:1.2em"></div>' +
@@ -548,6 +734,7 @@
 
   injectHeroEditor();
   injectAdminButtons();
+  injectMemberAvatarOverlay();
   injectGuideEditor();
   console.log('--- ADMIN LOGIC ACTIVE ---');
 })();
