@@ -396,6 +396,21 @@ footer { background: var(--black2); border-top: 1px solid var(--border); padding
 .footer-links a:hover { color: var(--gold); }
 .footer-copy { font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.1em; }
 
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* NAV — attiva lo stesso menu mobile già esistente, evitando l'overflow della nav desktop su tablet */
+  .nav-links { display: none; }
+  .btn-ghost { display: none; }
+  .nav-actions .btn-gold { display: none; }
+  .hamburger { display: flex; }
+  .mobile-menu { display: flex; }
+
+  /* HERO — evita sovrapposizioni delle immagini a posizione libera su aspect ratio tablet */
+  .hero-img-wrapper { display: none !important; }
+
+  /* MEMBERS GRID — da 6 a 4 colonne, gap desktop invariato */
+  .member-card { flex: 0 0 calc((100% - 3 * 1.5rem) / 4); }
+}
+
 @media (max-width: 768px) {
   /* NAV */
   nav { padding: 0 1.2rem; }
