@@ -7,10 +7,12 @@
     <div id="memberEditModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);align-items:center;justify-content:center">
       <div style="background:var(--surface);border:1px solid var(--border-bright);padding:2.5rem;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;position:relative">
         <button onclick="closeMemberEdit()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--text-muted);font-size:1.1rem;cursor:pointer;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
-        <div style="font-family:'Orbitron',sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Modifica Membro</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem" id="memberEditTitle">Modifica Membro</div>
         <div id="memberEditName" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:1.2rem"></div>
         <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem">Nome</div>
         <input id="memberEditNameInput" type="text" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);font-size:0.85rem;padding:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:1.5rem">
+        <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem">Ruolo</div>
+        <input id="memberEditRole" type="text" placeholder="es. Player" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);font-size:0.85rem;padding:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:1.5rem">
         <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem">Data di nascita</div>
         <input id="memberEditBirth" type="text" placeholder="es. 15/03/2001" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);font-size:0.85rem;padding:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box">
         <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin:1.5rem 0 0.6rem">Top Risultati (uno per riga)</div>
@@ -33,10 +35,23 @@
     const m = [...membersData.founders, ...membersData.players].find(x => x.id === id);
     if (!m) return;
     window.currentEditingMemberId = id;
+    document.getElementById('memberEditTitle').textContent = 'Modifica Membro';
     document.getElementById('memberEditName').textContent = m.name;
     document.getElementById('memberEditNameInput').value = m.name;
+    document.getElementById('memberEditRole').value = m.role || '';
     document.getElementById('memberEditBirth').value = m.birth || '';
     document.getElementById('memberEditTops').value = m.tops.join('\n');
+    document.getElementById('memberEditModal').style.display = 'flex';
+  };
+
+  window.openCreateMemberModal = function() {
+    window.currentEditingMemberId = null;
+    document.getElementById('memberEditTitle').textContent = 'Nuovo Membro';
+    document.getElementById('memberEditName').textContent = '';
+    document.getElementById('memberEditNameInput').value = '';
+    document.getElementById('memberEditRole').value = 'Pro Player';
+    document.getElementById('memberEditBirth').value = '';
+    document.getElementById('memberEditTops').value = '';
     document.getElementById('memberEditModal').style.display = 'flex';
   };
 
@@ -44,41 +59,86 @@
     document.getElementById('memberEditModal').style.display = 'none';
   };
 
+  async function postContent(data) {
+    return fetch('/api/save-content', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('wet_admin_token')
+      },
+      body: JSON.stringify(data)
+    });
+  }
+
+  async function fetchContent() {
+    try { return await fetch('/api/get-content?t=' + Date.now()).then(r => r.json()); } catch(e) { return {}; }
+  }
+
   window.saveMemberEdit = async function() {
-    const m = [...membersData.founders, ...membersData.players].find(x => x.id === window.currentEditingMemberId);
-    if (!m) return;
-    
-    m.name = document.getElementById('memberEditNameInput').value;
-    m.birth = document.getElementById('memberEditBirth').value;
-    m.tops = document.getElementById('memberEditTops').value.split('\n').filter(t => t.trim() !== '');
-    
+    const name = document.getElementById('memberEditNameInput').value.trim();
+    const role = document.getElementById('memberEditRole').value.trim();
+    const birth = document.getElementById('memberEditBirth').value;
+    const tops = document.getElementById('memberEditTops').value.split('\n').filter(t => t.trim() !== '');
+    const isNew = !window.currentEditingMemberId;
+    let m;
+
+    if (isNew) {
+      if (!name) { showToast('Inserisci un nome'); return; }
+      const initials = name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      m = { id: 'm-' + Date.now(), initials, name, role: role || 'Pro Player', birth, tops, photo: null };
+    } else {
+      m = [...membersData.founders, ...membersData.players].find(x => x.id === window.currentEditingMemberId);
+      if (!m) return;
+      Object.assign(m, { name, birth, tops });
+      if (role) m.role = role;
+    }
+
     try {
-      const res = await fetch('/api/save-content', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + localStorage.getItem('wet_admin_token')
-        },
-        body: JSON.stringify(await getMemberDataMap())
-      });
+      const data = await fetchContent();
+      if (isNew) {
+        data.addedMembers = (data.addedMembers || []).concat([{ id: m.id, initials: m.initials, name: m.name, role: m.role, birth: m.birth, tops: m.tops }]);
+      } else {
+        [...membersData.founders, ...membersData.players].forEach(x => {
+          data[x.id] = { name: x.name, role: x.role, birth: x.birth, tops: x.tops };
+        });
+        // i membri aggiunti vivono anche in addedMembers: tienili allineati
+        if (Array.isArray(data.addedMembers)) {
+          data.addedMembers = data.addedMembers.map(a => a.id === m.id ? Object.assign({}, a, { name: m.name, role: m.role, birth: m.birth, tops: m.tops }) : a);
+        }
+      }
+      const res = await postContent(data);
       if (res.ok) {
-        showToast('Modifiche salvate con successo. Saranno disponibili tra qualche minuto.');
+        if (isNew) membersData.players.push(m);
+        showToast(isNew ? 'Membro aggiunto' : 'Modifiche salvate con successo. Saranno disponibili tra qualche minuto.');
         renderMembers();
         closeMemberEdit();
+      } else {
+        showToast('Errore durante il salvataggio');
       }
     } catch(e) {
       showToast('Errore durante il salvataggio');
     }
   };
 
-  async function getMemberDataMap() {
-    let data = {};
-    try { data = await fetch('/api/get-content?t=' + Date.now()).then(r => r.json()); } catch(e) {}
-    [...membersData.founders, ...membersData.players].forEach(m => {
-      data[m.id] = { name: m.name, birth: m.birth, tops: m.tops };
-    });
-    return data;
-  }
+  window.deleteMember = async function(id) {
+    const m = membersData.players.find(x => x.id === id) || membersData.founders.find(x => x.id === id);
+    if (!m || !confirm('Eliminare ' + m.name + '?')) return;
+    try {
+      const data = await fetchContent();
+      const wasAdded = (data.addedMembers || []).some(a => a.id === id);
+      if (wasAdded) {
+        data.addedMembers = data.addedMembers.filter(a => a.id !== id);
+      } else {
+        data.removedMembers = (data.removedMembers || []).concat([id]);
+      }
+      delete data[id];
+      const res = await postContent(data);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      membersData.players = membersData.players.filter(x => x.id !== id);
+      membersData.founders = membersData.founders.filter(x => x.id !== id);
+      renderMembers();
+    } catch(e) { showToast('Errore eliminazione'); }
+  };
 
   window.injectAdminButtons = function() {
     console.log('Injecting admin buttons...');
@@ -92,6 +152,12 @@
         editBtn.style.cssText = 'position:absolute; top:10px; right:10px; z-index:100; background:rgba(212,175,55,0.9); color:black; border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; font-weight:bold; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(0,0,0,0.5);';
         editBtn.onclick = (e) => { e.stopPropagation(); openMemberEdit(m.id); };
         card.appendChild(editBtn);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'admin-delete-btn';
+        delBtn.textContent = '✕';
+        delBtn.style.cssText = 'position:absolute; top:10px; right:48px; z-index:100; background:rgba(180,0,0,0.9); color:#fff; border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; font-weight:bold; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(0,0,0,0.5);';
+        delBtn.onclick = (e) => { e.stopPropagation(); deleteMember(m.id); };
+        card.appendChild(delBtn);
       }
     });
   };
@@ -732,9 +798,26 @@
     setTimeout(injectGuideAdminOverlays, 500);
   }
 
+  function injectMemberEditor() {
+    var grid = document.getElementById('playersGrid');
+    if (!grid || document.querySelector('.member-admin-bar')) return;
+    var bar = document.createElement('div');
+    bar.className = 'member-admin-bar';
+    bar.style.cssText = 'display:flex;justify-content:flex-end;max-width:1300px;margin:0 auto 1rem';
+    var addBtn = document.createElement('button');
+    addBtn.textContent = '+ AGGIUNGI MEMBRO';
+    addBtn.onclick = function() { openCreateMemberModal(); };
+    addBtn.style.cssText = 'font-family:\'Orbitron\',sans-serif;font-size:0.62rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;padding:8px 20px;background:var(--gold);color:var(--black);border:none;cursor:pointer;transition:background 0.2s';
+    addBtn.onmouseover = function() { this.style.background = 'var(--gold-light)'; };
+    addBtn.onmouseout = function() { this.style.background = 'var(--gold)'; };
+    bar.appendChild(addBtn);
+    grid.parentNode.insertBefore(bar, grid);
+  }
+
   injectHeroEditor();
   injectAdminButtons();
   injectMemberAvatarOverlay();
   injectGuideEditor();
+  injectMemberEditor();
   console.log('--- ADMIN LOGIC ACTIVE ---');
 })();

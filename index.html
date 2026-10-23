@@ -877,8 +877,22 @@ async function migrateLocalStoragePhotos() {
   } catch(e) {}
 }
 
+// Applica aggiunte/rimozioni di membri salvate dall'admin (idempotente)
+function applyMemberListChanges(data) {
+  if (!data) return;
+  const removed = Array.isArray(data.removedMembers) ? data.removedMembers : [];
+  const added = Array.isArray(data.addedMembers) ? data.addedMembers : [];
+  membersData.players = membersData.players.filter(m => !removed.includes(m.id));
+  added.forEach(a => {
+    if (!membersData.players.some(m => m.id === a.id)) {
+      membersData.players.push({ photo: null, tops: [], birth: '', ...a });
+    }
+  });
+}
+
 async function loadMemberPhotos() {
   try {
+    try { applyMemberListChanges(await window._contentPromise); } catch(e) {}
     await migrateLocalStoragePhotos();
     const res = await fetch(`${SERVER_URL}/api/get-photos`);
     const photos = await res.json();
@@ -937,10 +951,12 @@ async function loadMemberContent() {
     }
 
     if (!data || Object.keys(data).length === 0) return;
-    
+
+    applyMemberListChanges(data);
     [...membersData.founders, ...membersData.players].forEach(m => {
       if (data[m.id]) {
         if (data[m.id].name) m.name = data[m.id].name;
+        if (data[m.id].role) m.role = data[m.id].role;
         if (data[m.id].birth !== undefined) m.birth = data[m.id].birth;
         if (Array.isArray(data[m.id].tops)) m.tops = data[m.id].tops;
       }
