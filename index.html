@@ -1119,7 +1119,29 @@ function renderMemberGrid(gridId, list, isFounder) {
       <div class="member-expand-hint" id="hint-${m.id}">${t('expand_hint')}</div>
     </div>`;
   }).join('');
+  if (gridId === 'playersGrid') balanceMemberGrid();
 }
+
+// Righe bilanciate (es. 8 membri -> 4+4) senza cambiare la larghezza delle card
+function balanceMemberGrid() {
+  const grid = document.getElementById('playersGrid');
+  if (!grid) return;
+  grid.querySelectorAll('.row-break').forEach(b => b.remove());
+  const cards = grid.querySelectorAll('.member-card');
+  const n = cards.length;
+  if (!n) return;
+  const w = window.innerWidth;
+  const max = w > 768 ? 6 : w > 480 ? 4 : 2;
+  const perRow = Math.ceil(n / Math.ceil(n / max));
+  const gap = getComputedStyle(grid).rowGap;
+  for (let i = perRow; i < n; i += perRow) {
+    const br = document.createElement('div');
+    br.className = 'row-break';
+    br.style.cssText = 'flex:0 0 100%;height:0;margin-top:-' + gap;
+    cards[i].before(br);
+  }
+}
+window.addEventListener('resize', balanceMemberGrid);
 
 function toggleMember(e, id) {
   const card = e.currentTarget;
