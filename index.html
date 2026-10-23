@@ -135,7 +135,7 @@ section { position: relative; z-index: 1; }
 }
 #members > * { position: relative; z-index: 1; }
 .members-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; max-width: 1300px; margin: 0 auto; }
-.member-card { background: var(--black2); border: 1px solid var(--border); padding: 2rem 1.5rem; text-align: center; position: relative; transition: all 0.3s; overflow: hidden; flex: 0 0 calc((100% - 5 * 1.5rem) / 6); }
+.member-card { background: var(--black2); border: 1px solid var(--border); padding: 2rem 1.5rem; text-align: center; position: relative; transition: all 0.3s; overflow: hidden; flex: 0 0 calc((100% - (var(--cols,6) - 1) * 1.5rem) / var(--cols,6)); }
 .member-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); transform: scaleX(0); transition: transform 0.4s; }
 .member-card:hover { border-color: var(--border-bright); transform: translateY(-4px); }
 .member-card:hover::before { transform: scaleX(1); }
@@ -396,6 +396,21 @@ footer { background: var(--black2); border-top: 1px solid var(--border); padding
 .footer-links a:hover { color: var(--gold); }
 .footer-copy { font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.1em; }
 
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* NAV — attiva lo stesso menu mobile già esistente, evitando l'overflow della nav desktop su tablet */
+  .nav-links { display: none; }
+  .btn-ghost { display: none; }
+  .nav-actions .btn-gold { display: none; }
+  .hamburger { display: flex; }
+  .mobile-menu { display: flex; }
+
+  /* HERO — evita sovrapposizioni delle immagini a posizione libera su aspect ratio tablet */
+  .hero-img-wrapper { display: none !important; }
+
+  /* MEMBERS GRID — da 6 a 4 colonne, gap desktop invariato */
+  .member-card { flex: 0 0 calc((100% - (var(--cols,4) - 1) * 1.5rem) / var(--cols,4)); }
+}
+
 @media (max-width: 768px) {
   /* NAV */
   nav { padding: 0 1.2rem; }
@@ -423,7 +438,7 @@ footer { background: var(--black2); border-top: 1px solid var(--border); padding
 
   /* MEMBERS GRID */
   .members-grid { gap: 1rem; }
-  .member-card { flex: 0 0 calc((100% - 3 * 1rem) / 4); }
+  .member-card { flex: 0 0 calc((100% - (var(--cols,4) - 1) * 1rem) / var(--cols,4)); }
 
   /* PLANS */
   .plans-grid { grid-template-columns: 1fr; gap: 1.5rem; }
@@ -465,7 +480,7 @@ footer { background: var(--black2); border-top: 1px solid var(--border); padding
 
   /* MEMBERS GRID — 2 colonne fisse su mobile piccolo */
   .members-grid { gap: 0.75rem; }
-  .member-card { padding: 1.2rem 0.8rem; flex: 0 0 calc((100% - 0.75rem) / 2); }
+  .member-card { padding: 1.2rem 0.8rem; flex: 0 0 calc((100% - (var(--cols,2) - 1) * 0.75rem) / var(--cols,2)); }
   .member-avatar { width: 56px; height: 56px; font-size: 1.1rem; }
   .member-name { font-size: 0.72rem; }
   .member-role { font-size: 0.55rem; }
@@ -1053,6 +1068,18 @@ function renderMembers() {
   renderMemberGrid('playersGrid', allMembers, false);
 }
 
+// Righe bilanciate: es. 8 membri su max 6 colonne -> 4 + 4 invece di 6 + 2
+function balanceMemberGrid() {
+  const grid = document.getElementById('playersGrid');
+  if (!grid) return;
+  const n = grid.children.length;
+  if (!n) return;
+  const w = window.innerWidth;
+  const max = w > 1024 ? 6 : w > 480 ? 4 : 2;
+  grid.style.setProperty('--cols', Math.ceil(n / Math.ceil(n / max)));
+}
+window.addEventListener('resize', balanceMemberGrid);
+
 function renderMemberGrid(gridId, list, isFounder) {
   const grid = document.getElementById(gridId);
   grid.innerHTML = list.map(m => {
@@ -1105,6 +1132,7 @@ function renderMemberGrid(gridId, list, isFounder) {
       <div class="member-expand-hint" id="hint-${m.id}">${t('expand_hint')}</div>
     </div>`;
   }).join('');
+  if (gridId === 'playersGrid') balanceMemberGrid();
 }
 
 function toggleMember(e, id) {
