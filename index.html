@@ -144,6 +144,7 @@ section { position: relative; z-index: 1; }
 .member-card.founder .member-avatar { border-color: var(--gold); box-shadow: 0 0 18px rgba(201,168,76,0.3); }
 .member-role { font-size: 0.58rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.4rem; }
 .member-name { font-family: 'Orbitron', sans-serif; font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; line-height: 1.3; }
+.member-world { position: absolute; top: 0.75rem; left: 0.6rem; right: 0.6rem; text-align: center; font-family: 'Orbitron', sans-serif; font-size: 0.55rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #b5214f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .member-top-preview { font-size: 0.75rem; color: var(--gold); opacity: 0.8; margin: 0.4rem auto 0; max-width: 90%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; }
 .member-game { font-size: 0.72rem; color: var(--text-dim); }
 .founder-crown { font-size: 0.75rem; display: block; margin-bottom: 0.5rem; }
@@ -321,6 +322,7 @@ section { position: relative; z-index: 1; }
 
 .member-role { font-size: 0.58rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.4rem; }
 .member-name { font-family: 'Orbitron', sans-serif; font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; line-height: 1.3; }
+.member-world { position: absolute; top: 0.75rem; left: 0.6rem; right: 0.6rem; text-align: center; font-family: 'Orbitron', sans-serif; font-size: 0.55rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #b5214f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .founder-crown { font-size: 0.75rem; display: block; margin-bottom: 0.5rem; }
 
 
@@ -884,7 +886,7 @@ function applyMemberListChanges(data) {
   membersData.players = membersData.players.filter(m => !removed.includes(m.id));
   added.forEach(a => {
     if (!membersData.players.some(m => m.id === a.id)) {
-      membersData.players.push({ photo: null, tops: [], birth: '', ...a });
+      membersData.players.push({ photo: null, tops: [], birth: '', world: '', ...a });
     }
   });
 }
@@ -957,6 +959,7 @@ async function loadMemberContent() {
         if (data[m.id].name) m.name = data[m.id].name;
         if (data[m.id].role) m.role = data[m.id].role;
         if (data[m.id].birth !== undefined) m.birth = data[m.id].birth;
+        if (data[m.id].world !== undefined) m.world = data[m.id].world;
         if (Array.isArray(data[m.id].tops)) m.tops = data[m.id].tops;
       }
     });
@@ -974,7 +977,7 @@ async function saveMemberContent() {
   try {
     const data = {};
     [...membersData.founders, ...membersData.players].forEach(m => {
-      data[m.id] = { name: m.name, birth: m.birth, tops: m.tops };
+      data[m.id] = { name: m.name, birth: m.birth, world: m.world || '', tops: m.tops };
     });
     
     // Save to localStorage for quick local update
@@ -1084,6 +1087,7 @@ function renderMemberGrid(gridId, list, isFounder) {
       <!-- COLLAPSED state: small avatar + name -->
       <div class="member-header-collapsed">
 
+        ${m.world ? `<div class="member-world" title="${m.world}">${m.world}</div>` : ''}
         <div class="member-avatar" id="avatar-${m.id}">
           ${avatarInner}
         </div>
