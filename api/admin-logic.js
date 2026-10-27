@@ -11,6 +11,8 @@
         <div id="memberEditName" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:1.2rem"></div>
         <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem">Nome</div>
         <input id="memberEditNameInput" type="text" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);font-size:0.85rem;padding:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:1.5rem">
+        <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem">World Competitor (opzionale)</div>
+        <input id="memberEditWorld" type="text" maxlength="40" placeholder="es. World Competitor 2025" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);font-size:0.85rem;padding:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:1.5rem">
         <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem">Ruolo</div>
         <input id="memberEditRole" type="text" placeholder="es. Player" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);font-size:0.85rem;padding:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:1.5rem">
         <div style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem">Data di nascita</div>
@@ -40,6 +42,7 @@
     document.getElementById('memberEditNameInput').value = m.name;
     document.getElementById('memberEditRole').value = m.role || '';
     document.getElementById('memberEditBirth').value = m.birth || '';
+    document.getElementById('memberEditWorld').value = m.world || '';
     document.getElementById('memberEditTops').value = m.tops.join('\n');
     document.getElementById('memberEditModal').style.display = 'flex';
   };
@@ -51,6 +54,7 @@
     document.getElementById('memberEditNameInput').value = '';
     document.getElementById('memberEditRole').value = 'Pro Player';
     document.getElementById('memberEditBirth').value = '';
+    document.getElementById('memberEditWorld').value = '';
     document.getElementById('memberEditTops').value = '';
     document.getElementById('memberEditModal').style.display = 'flex';
   };
@@ -78,6 +82,7 @@
     const name = document.getElementById('memberEditNameInput').value.trim();
     const role = document.getElementById('memberEditRole').value.trim();
     const birth = document.getElementById('memberEditBirth').value;
+    const world = document.getElementById('memberEditWorld').value.replace(/\s+/g, ' ').trim();
     const tops = document.getElementById('memberEditTops').value.split('\n').filter(t => t.trim() !== '');
     const isNew = !window.currentEditingMemberId;
     let m;
@@ -85,25 +90,25 @@
     if (isNew) {
       if (!name) { showToast('Inserisci un nome'); return; }
       const initials = name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-      m = { id: 'm-' + Date.now(), initials, name, role: role || 'Pro Player', birth, tops, photo: null };
+      m = { id: 'm-' + Date.now(), initials, name, role: role || 'Pro Player', birth, world, tops, photo: null };
     } else {
       m = [...membersData.founders, ...membersData.players].find(x => x.id === window.currentEditingMemberId);
       if (!m) return;
-      Object.assign(m, { name, birth, tops });
+      Object.assign(m, { name, birth, world, tops });
       if (role) m.role = role;
     }
 
     try {
       const data = await fetchContent();
       if (isNew) {
-        data.addedMembers = (data.addedMembers || []).concat([{ id: m.id, initials: m.initials, name: m.name, role: m.role, birth: m.birth, tops: m.tops }]);
+        data.addedMembers = (data.addedMembers || []).concat([{ id: m.id, initials: m.initials, name: m.name, role: m.role, birth: m.birth, world: m.world, tops: m.tops }]);
       } else {
         [...membersData.founders, ...membersData.players].forEach(x => {
-          data[x.id] = { name: x.name, role: x.role, birth: x.birth, tops: x.tops };
+          data[x.id] = { name: x.name, role: x.role, birth: x.birth, world: x.world || '', tops: x.tops };
         });
         // i membri aggiunti vivono anche in addedMembers: tienili allineati
         if (Array.isArray(data.addedMembers)) {
-          data.addedMembers = data.addedMembers.map(a => a.id === m.id ? Object.assign({}, a, { name: m.name, role: m.role, birth: m.birth, tops: m.tops }) : a);
+          data.addedMembers = data.addedMembers.map(a => a.id === m.id ? Object.assign({}, a, { name: m.name, role: m.role, birth: m.birth, world: m.world, tops: m.tops }) : a);
         }
       }
       const res = await postContent(data);
