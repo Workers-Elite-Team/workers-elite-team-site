@@ -293,7 +293,7 @@ section { position: relative; z-index: 1; }
 }
 .member-tops li::before { content: '◆'; font-size: 0.35rem; color: var(--gold); flex-shrink: 0; }
 .member-tops-wrap { position: relative; }
-.member-tops { position: relative; overflow: hidden; } /* altezza impostata da fitTops: solo risultati interi */
+.member-tops { position: relative; overflow: hidden; scroll-behavior: smooth; transition: height 0.35s ease; } /* altezza impostata da fitTops: solo risultati interi */
 .tops-arrow { display: none; text-align: center; color: var(--gold); font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0; animation: tops-bounce 1.4s ease-in-out infinite; }
 .tops-arrow.visible { display: block; }
 @keyframes tops-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
