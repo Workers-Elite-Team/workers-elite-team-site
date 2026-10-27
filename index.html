@@ -136,7 +136,6 @@ section { position: relative; z-index: 1; }
 }
 #members > * { position: relative; z-index: 1; }
 .members-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; max-width: 1300px; margin: 0 auto; }
-.has-expanded .members-grid { align-items: flex-start; } /* la card aperta non allunga le altre della fila */
 .member-card { background: var(--black2); border: 1px solid var(--border); padding: 2rem 1.5rem; text-align: center; position: relative; transition: all 0.3s; overflow: hidden; flex: 0 0 calc((100% - 5 * 1.5rem) / 6); }
 .member-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); transform: scaleX(0); transition: transform 0.4s; }
 .member-card:hover { border-color: var(--border-bright); transform: translateY(-4px); }
