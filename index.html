@@ -274,12 +274,11 @@ section { position: relative; z-index: 1; }
 }
 .member-card.expanded .member-panel { max-height: 600px; opacity: 1; }
 .member-panel-inner {
-  border-top: 1px solid var(--border);
-  margin-top: 1.2rem; padding-top: 1.2rem;
+  margin-top: 1.2rem;
   text-align: left;
 }
 .member-birth { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;
-  padding: 0.6rem 0; border-bottom: 1px solid var(--border); margin-bottom: 0.9rem; }
+  padding: 0 0 0.6rem; border-bottom: 1px solid var(--border); margin-bottom: 0.9rem; }
 .member-birth-label { font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
 .member-birth-value { font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--text); }
 .member-tops-title {
@@ -294,9 +293,7 @@ section { position: relative; z-index: 1; }
 }
 .member-tops li::before { content: '◆'; font-size: 0.35rem; color: var(--gold); flex-shrink: 0; }
 .member-tops-wrap { position: relative; }
-.member-tops { max-height: 8.5rem; overflow-y: hidden; scroll-behavior: smooth; }
-.member-tops.has-overflow { overflow-y: auto; scrollbar-width: none; }
-.member-tops.has-overflow::-webkit-scrollbar { display: none; }
+.member-tops { position: relative; overflow: hidden; scroll-behavior: smooth; transition: height 0.35s ease; } /* altezza impostata da fitTops: solo risultati interi */
 .tops-arrow { display: none; text-align: center; color: var(--gold); font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0; animation: tops-bounce 1.4s ease-in-out infinite; }
 .tops-arrow.visible { display: block; }
 @keyframes tops-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
@@ -1167,35 +1164,50 @@ function toggleMember(e, id) {
   const anyOpen = document.querySelector('.member-card.expanded');
   document.getElementById('members').classList.toggle('has-expanded', !!anyOpen);
 }
+// Mostra solo risultati interi: l'altezza della lista è la somma dei <li> che
+// stanno nei 8.5rem a partire dal primo visibile; la freccia sta subito sotto.
+function fitTops(id, first) {
+  const ul  = document.getElementById('tops-' + id);
+  const arr = document.getElementById('tops-arrow-' + id);
+  if (!ul || !arr) return;
+  const lis = [...ul.children];
+  const n = lis.length;
+  if (!n) return;
+  const limit = parseFloat(getComputedStyle(document.documentElement).fontSize) * 8.5;
+  first = Math.max(0, Math.min(first || 0, n - 1));
+  const bottom = i => lis[i].offsetTop + lis[i].offsetHeight;
+  const top = lis[first].offsetTop;
+  let last = first;
+  while (last + 1 < n && bottom(last + 1) - top <= limit) last++;
+  ul.style.height = (bottom(last) - top) + 'px';
+  ul.scrollTop = top;
+  ul._first = first; ul._last = last;
+  arr.classList.toggle('visible', first > 0 || last < n - 1);
+  arr.textContent = last >= n - 1 ? '▴' : '▾';
+}
 function scrollTops(e, id) {
   e.stopPropagation();
   const ul = document.getElementById('tops-' + id);
   if (!ul) return;
-  const atBottom = ul.scrollTop + ul.clientHeight >= ul.scrollHeight - 4;
-  if (atBottom) {
-    ul.scrollTop = 0;
-  } else {
-    const li = ul.querySelector('li');
-    ul.scrollTop += li ? li.offsetHeight * 3 : 120;
-  }
-  updateTopsArrow(id);
+  const done = ul._last >= ul.children.length - 1;
+  fitTops(id, done ? 0 : ul._last + 1);
 }
 function handleTopsWheel(e, id) {
   e.preventDefault();
   const ul = document.getElementById('tops-' + id);
   if (!ul) return;
-  const li = ul.querySelector('li');
-  const step = li ? li.offsetHeight : 40;
-  ul.scrollTop += e.deltaY > 0 ? step : -step;
-  updateTopsArrow(id);
+  const n = ul.children.length;
+  if (e.deltaY > 0 && ul._last < n - 1) fitTops(id, ul._first + 1);
+  else if (e.deltaY < 0 && ul._first > 0) fitTops(id, ul._first - 1);
 }
 function updateTopsArrow(id) {
-  const ul  = document.getElementById('tops-' + id);
-  const arr = document.getElementById('tops-arrow-' + id);
-  if (!ul || !arr) return;
-  const atBottom = ul.scrollTop + ul.clientHeight >= ul.scrollHeight - 4;
-  arr.textContent = atBottom ? '▴' : '▾';
+  const ul = document.getElementById('tops-' + id);
+  fitTops(id, ul ? ul._first : 0);
 }
+window.addEventListener('resize', () => {
+  const open = document.querySelector('.member-card.expanded');
+  if (open) updateTopsArrow(open.dataset.id);
+});
 
 document.addEventListener('click', e => {
   if (!e.target.closest('.member-card')) {
