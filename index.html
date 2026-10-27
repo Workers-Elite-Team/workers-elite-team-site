@@ -1166,17 +1166,7 @@ function toggleMember(e, id) {
     setTimeout(() => updateTopsArrow(id), 50);
   }
   const anyOpen = document.querySelector('.member-card.expanded');
-  setHasExpanded(!!anyOpen);
-}
-
-// Alla chiusura il flag resta finché finisce la transizione del pannello (0.45s),
-// altrimenti le altre card della fila si allungano durante l'animazione di uscita.
-let hasExpandedTimer;
-function setHasExpanded(on) {
-  clearTimeout(hasExpandedTimer);
-  const el = document.getElementById('members');
-  if (on) el.classList.add('has-expanded');
-  else hasExpandedTimer = setTimeout(() => el.classList.remove('has-expanded'), 500);
+  document.getElementById('members').classList.toggle('has-expanded', !!anyOpen);
 }
 function scrollTops(e, id) {
   e.stopPropagation();
@@ -1215,7 +1205,7 @@ document.addEventListener('click', e => {
       const hintEl = c.querySelector('[id^="hint-"]');
       if (hintEl) hintEl.textContent = t('expand_hint');
     });
-    setHasExpanded(false);
+    document.getElementById('members').classList.remove('has-expanded');
   }
 });
 
