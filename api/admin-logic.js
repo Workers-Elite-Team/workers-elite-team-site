@@ -871,7 +871,7 @@
     bgState.cfg = { src: c.src || '', x: c.x == null ? 50 : c.x, y: c.y == null ? 0 : c.y, zoom: c.zoom || 100, opacity: c.opacity == null ? 0.18 : c.opacity };
     var sec = document.getElementById(id);
     document.getElementById('bgPreview').style.aspectRatio = sec.offsetWidth + ' / ' + sec.offsetHeight;
-    document.getElementById('bgSecSelect').value = id;
+    document.getElementById('bgSecTitle').textContent = BG_SECTIONS.filter(function(x) { return x.id === id; })[0].label;
     document.getElementById('bgRangeX').value = bgState.cfg.x;
     document.getElementById('bgRangeY').value = bgState.cfg.y;
     document.getElementById('bgRangeZoom').value = bgState.cfg.zoom;
@@ -905,7 +905,7 @@
     } catch (err) { status.textContent = 'Errore salvataggio: ' + err.message; }
   }
 
-  window.openSectionBgEditor = async function() {
+  window.openSectionBgEditor = async function(sectionId) {
     var content = await fetchContent();
     bgState = { bgs: content.sectionBgs || {}, id: null, cfg: null };
     var modal = document.getElementById('bgEditorModal');
@@ -917,10 +917,7 @@
       var btn = 'flex:1;padding:10px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;';
       modal.innerHTML =
         '<div style="background:var(--surface);border:1px solid var(--border-bright);padding:1.5rem;width:min(94vw,860px);max-height:92vh;overflow-y:auto">' +
-          '<div style="font-family:Orbitron,sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Sfondi sezioni</div>' +
-          '<select id="bgSecSelect" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);padding:0.7rem;margin-bottom:1rem">' +
-            BG_SECTIONS.map(function(s) { return '<option value="' + s.id + '">' + s.label + '</option>'; }).join('') +
-          '</select>' +
+          '<div style="font-family:Orbitron,sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Sfondo — <span id="bgSecTitle"></span></div>' +
           '<div id="bgPreview" style="position:relative;overflow:hidden;background:var(--black);border:1px solid var(--border);cursor:grab;touch-action:none;width:100%;max-height:50vh;margin:0 auto">' +
             '<div id="bgPreviewLayer" style="position:absolute;inset:0;background-size:cover;background-repeat:no-repeat;pointer-events:none"></div>' +
             '<div style="position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(201,168,76,0.4);display:flex;align-items:flex-start;justify-content:center;padding:6% 8%"><div style="width:100%;height:60%;border:1px dashed rgba(201,168,76,0.35);display:flex;align-items:center;justify-content:center;font-size:0.6rem;letter-spacing:0.2em;color:rgba(201,168,76,0.6);text-transform:uppercase">area contenuti</div></div>' +
@@ -945,10 +942,6 @@
         document.getElementById(rid).addEventListener('input', function(e) { bgState.cfg[key] = parseFloat(e.target.value); bgPreviewApply(); });
       };
       bind('bgRangeX', 'x'); bind('bgRangeY', 'y'); bind('bgRangeZoom', 'zoom'); bind('bgRangeOp', 'opacity');
-      document.getElementById('bgSecSelect').addEventListener('change', function(e) {
-        window.applySectionBgs(bgState.bgs);
-        bgSelectSection(e.target.value);
-      });
       document.getElementById('bgBtnUpload').onclick = function() { document.getElementById('bgFile').click(); };
       document.getElementById('bgBtnCancel').onclick = function() { bgClose(true); };
       document.getElementById('bgBtnReset').onclick = function() { bgSave(true); };
@@ -989,19 +982,22 @@
       pv.addEventListener('pointercancel', end);
     }
     modal.style.display = 'flex';
-    bgSelectSection(BG_SECTIONS[0].id);
+    bgSelectSection(sectionId);
   };
 
   function injectSectionBgButton() {
-    if (document.getElementById('adminBgBtn')) return;
-    var b = document.createElement('button');
-    b.id = 'adminBgBtn';
-    b.textContent = 'SFONDI SEZIONI';
-    b.onclick = function() { window.openSectionBgEditor(); };
-    b.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:10000;font-family:'Orbitron',sans-serif;font-size:0.62rem;font-weight:700;letter-spacing:0.15em;padding:10px 18px;background:var(--gold);color:var(--black);border:none;cursor:pointer;box-shadow:0 8px 32px rgba(0,0,0,0.7)";
-    document.body.appendChild(b);
+    BG_SECTIONS.forEach(function(sec) {
+      var el = document.getElementById(sec.id);
+      if (!el || el.querySelector('.sec-bg-pencil')) return;
+      var b = document.createElement('button');
+      b.className = 'sec-bg-pencil';
+      b.title = 'Modifica sfondo: ' + sec.label;
+      b.textContent = '✎';
+      b.onclick = function() { window.openSectionBgEditor(sec.id); };
+      b.style.cssText = 'position:absolute;top:88px;right:20px;z-index:50;width:38px;height:38px;border-radius:50%;font-size:1.1rem;line-height:1;background:var(--gold);color:var(--black);border:none;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.6)';
+      el.appendChild(b);
+    });
   }
-
 
   injectHeroEditor();
   injectSectionBgButton();
