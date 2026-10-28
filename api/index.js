@@ -159,6 +159,25 @@ app.post(['/api/save-guide-photo', '/save-guide-photo'], authenticate, async (re
   }
 });
 
+app.post(['/api/save-section-bg', '/save-section-bg'], authenticate, async (req, res) => {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN non configurato su Vercel.' });
+  }
+  const { sectionId, dataUrl } = req.body;
+  if (!/^[a-z0-9-]+$/.test(sectionId || '') || !dataUrl) return res.status(400).json({ error: 'Dati mancanti' });
+  try {
+    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const blob = await put(`backgrounds/${sectionId}-${Date.now()}.jpg`, Buffer.from(base64, 'base64'), {
+      access: 'public',
+      contentType: 'image/jpeg',
+      addRandomSuffix: false
+    });
+    res.json({ success: true, url: blob.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get(['/api/get-photos', '/get-photos'], async (req, res) => {
   try {
     const photos = {};

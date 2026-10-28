@@ -819,7 +819,192 @@
     grid.parentNode.insertBefore(bar, grid);
   }
 
+  // ── Editor sfondi sezioni ──────────────────────────────────────────────────
+  var BG_SECTIONS = [
+    { id: 'members', label: 'Il Team' },
+    { id: 'academy', label: 'Academy' },
+    { id: 'guide', label: 'Guide' },
+    { id: 'social', label: 'Social' }
+  ];
+  var bgState = null; // { bgs, id, cfg }
+
+  function bgToken() { return localStorage.getItem('wet_admin_token'); }
+
+  function bgResizeToDataUrl(file) {
+    return new Promise(function(resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function() {
+        var max = 2400, k = Math.min(1, max / Math.max(img.width, img.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function() { reject(new Error('Immagine non valida')); };
+      img.src = url;
+    });
+  }
+
+  function bgPreviewApply() {
+    var cfg = bgState.cfg, pv = document.getElementById('bgPreviewLayer');
+    var pos = cfg.x + '% ' + cfg.y + '%';
+    pv.style.backgroundImage = cfg.src ? 'url("' + cfg.src + '")' : 'none';
+    pv.style.backgroundPosition = pos;
+    pv.style.transformOrigin = pos;
+    pv.style.transform = 'scale(' + cfg.zoom / 100 + ')';
+    pv.style.opacity = cfg.opacity;
+    document.getElementById('bgValX').textContent = Math.round(cfg.x) + '%';
+    document.getElementById('bgValY').textContent = Math.round(cfg.y) + '%';
+    document.getElementById('bgValZoom').textContent = Math.round(cfg.zoom) + '%';
+    document.getElementById('bgValOp').textContent = Math.round(cfg.opacity * 100) + '%';
+    // anteprima live sulla pagina reale
+    var live = Object.assign({}, bgState.bgs);
+    live[bgState.id] = cfg.src ? cfg : null;
+    window.applySectionBgs(live);
+  }
+
+  function bgSelectSection(id) {
+    var c = bgState.bgs[id] || {};
+    bgState.id = id;
+    bgState.cfg = { src: c.src || '', x: c.x == null ? 50 : c.x, y: c.y == null ? 0 : c.y, zoom: c.zoom || 100, opacity: c.opacity == null ? 0.18 : c.opacity };
+    var sec = document.getElementById(id);
+    document.getElementById('bgPreview').style.aspectRatio = sec.offsetWidth + ' / ' + sec.offsetHeight;
+    document.getElementById('bgSecSelect').value = id;
+    document.getElementById('bgRangeX').value = bgState.cfg.x;
+    document.getElementById('bgRangeY').value = bgState.cfg.y;
+    document.getElementById('bgRangeZoom').value = bgState.cfg.zoom;
+    document.getElementById('bgRangeOp').value = bgState.cfg.opacity;
+    document.getElementById('bgStatus').textContent = bgState.cfg.src ? '' : 'Nessuna foto personalizzata (sfondo predefinito).';
+    bgPreviewApply();
+  }
+
+  function bgClose(revert) {
+    var m = document.getElementById('bgEditorModal');
+    if (m) m.style.display = 'none';
+    if (revert && bgState) window.applySectionBgs(bgState.bgs);
+  }
+
+  async function bgSave(remove) {
+    var status = document.getElementById('bgStatus'), cfg = bgState.cfg;
+    status.textContent = 'Salvataggio...';
+    try {
+      var existing = await fetchContent();
+      existing.sectionBgs = existing.sectionBgs || {};
+      if (remove || !cfg.src) delete existing.sectionBgs[bgState.id];
+      else existing.sectionBgs[bgState.id] = { src: cfg.src, x: cfg.x, y: cfg.y, zoom: cfg.zoom, opacity: cfg.opacity };
+      var res = await postContent(existing);
+      if (!res.ok) { var e = await res.json().catch(function() { return {}; }); status.textContent = 'Errore: ' + (e.error || res.status); return; }
+      bgState.bgs = existing.sectionBgs;
+      try { localStorage.setItem('wet_content_v1', JSON.stringify(existing)); } catch (err) {}
+      window._cachedContent = existing;
+      window.applySectionBgs(existing.sectionBgs);
+      if (remove) { bgSelectSection(bgState.id); status.textContent = 'Ripristinato lo sfondo predefinito.'; }
+      else status.textContent = 'Salvato.';
+    } catch (err) { status.textContent = 'Errore salvataggio: ' + err.message; }
+  }
+
+  window.openSectionBgEditor = async function() {
+    var content = await fetchContent();
+    bgState = { bgs: content.sectionBgs || {}, id: null, cfg: null };
+    var modal = document.getElementById('bgEditorModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'bgEditorModal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;font-family:inherit;color:var(--text)';
+      var lab = 'font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);display:flex;justify-content:space-between;margin:0.9rem 0 0.3rem';
+      var btn = 'flex:1;padding:10px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;';
+      modal.innerHTML =
+        '<div style="background:var(--surface);border:1px solid var(--border-bright);padding:1.5rem;width:min(94vw,860px);max-height:92vh;overflow-y:auto">' +
+          '<div style="font-family:Orbitron,sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Sfondi sezioni</div>' +
+          '<select id="bgSecSelect" style="width:100%;background:var(--black2);border:1px solid var(--border);color:var(--text);padding:0.7rem;margin-bottom:1rem">' +
+            BG_SECTIONS.map(function(s) { return '<option value="' + s.id + '">' + s.label + '</option>'; }).join('') +
+          '</select>' +
+          '<div id="bgPreview" style="position:relative;overflow:hidden;background:var(--black);border:1px solid var(--border);cursor:grab;touch-action:none;width:100%;max-height:50vh;margin:0 auto">' +
+            '<div id="bgPreviewLayer" style="position:absolute;inset:0;background-size:cover;background-repeat:no-repeat;pointer-events:none"></div>' +
+            '<div style="position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(201,168,76,0.4);display:flex;align-items:flex-start;justify-content:center;padding:6% 8%"><div style="width:100%;height:60%;border:1px dashed rgba(201,168,76,0.35);display:flex;align-items:center;justify-content:center;font-size:0.6rem;letter-spacing:0.2em;color:rgba(201,168,76,0.6);text-transform:uppercase">area contenuti</div></div>' +
+          '</div>' +
+          '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.4rem">Trascina l\'anteprima per spostare la foto. La pagina dietro si aggiorna in tempo reale.</div>' +
+          '<div style="' + lab + '"><span>Posizione X</span><span id="bgValX"></span></div><input id="bgRangeX" type="range" min="0" max="100" step="0.5" style="width:100%">' +
+          '<div style="' + lab + '"><span>Posizione Y</span><span id="bgValY"></span></div><input id="bgRangeY" type="range" min="0" max="100" step="0.5" style="width:100%">' +
+          '<div style="' + lab + '"><span>Zoom</span><span id="bgValZoom"></span></div><input id="bgRangeZoom" type="range" min="100" max="300" step="1" style="width:100%">' +
+          '<div style="' + lab + '"><span>Opacità</span><span id="bgValOp"></span></div><input id="bgRangeOp" type="range" min="0.05" max="1" step="0.01" style="width:100%">' +
+          '<input id="bgFile" type="file" accept="image/*" style="display:none">' +
+          '<div id="bgStatus" style="font-size:0.75rem;color:var(--text-dim);min-height:1.2rem;margin:1rem 0 0.6rem"></div>' +
+          '<div style="display:flex;gap:0.6rem;flex-wrap:wrap">' +
+            '<button id="bgBtnUpload" style="' + btn + '">Carica foto</button>' +
+            '<button id="bgBtnReset" style="' + btn + '">Ripristina predefinito</button>' +
+            '<button id="bgBtnCancel" style="' + btn + '">Chiudi</button>' +
+            '<button id="bgBtnSave" style="flex:1;padding:10px;background:var(--gold);color:var(--black);border:none;cursor:pointer;font-weight:bold">Salva</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(modal);
+
+      var bind = function(rid, key) {
+        document.getElementById(rid).addEventListener('input', function(e) { bgState.cfg[key] = parseFloat(e.target.value); bgPreviewApply(); });
+      };
+      bind('bgRangeX', 'x'); bind('bgRangeY', 'y'); bind('bgRangeZoom', 'zoom'); bind('bgRangeOp', 'opacity');
+      document.getElementById('bgSecSelect').addEventListener('change', function(e) {
+        window.applySectionBgs(bgState.bgs);
+        bgSelectSection(e.target.value);
+      });
+      document.getElementById('bgBtnUpload').onclick = function() { document.getElementById('bgFile').click(); };
+      document.getElementById('bgBtnCancel').onclick = function() { bgClose(true); };
+      document.getElementById('bgBtnReset').onclick = function() { bgSave(true); };
+      document.getElementById('bgBtnSave').onclick = function() { bgSave(false); };
+      document.getElementById('bgFile').addEventListener('change', async function(e) {
+        var f = e.target.files[0], status = document.getElementById('bgStatus');
+        if (!f) return;
+        status.textContent = 'Caricamento foto...';
+        try {
+          var dataUrl = await bgResizeToDataUrl(f);
+          var res = await fetch('/api/save-section-bg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + bgToken() },
+            body: JSON.stringify({ sectionId: bgState.id, dataUrl: dataUrl })
+          });
+          var data = await res.json();
+          if (!data.url) { status.textContent = 'Errore upload: ' + (data.error || res.status); return; }
+          bgState.cfg.src = data.url;
+          status.textContent = 'Foto caricata: regola la posizione e premi Salva.';
+          bgPreviewApply();
+        } catch (err) { status.textContent = 'Errore upload: ' + err.message; }
+        e.target.value = '';
+      });
+      // trascinamento nell'anteprima
+      var pv = document.getElementById('bgPreview'), drag = null;
+      pv.addEventListener('pointerdown', function(e) { drag = { px: e.clientX, py: e.clientY, x: bgState.cfg.x, y: bgState.cfg.y }; pv.setPointerCapture(e.pointerId); pv.style.cursor = 'grabbing'; });
+      pv.addEventListener('pointermove', function(e) {
+        if (!drag) return;
+        var r = pv.getBoundingClientRect();
+        bgState.cfg.x = Math.max(0, Math.min(100, drag.x - (e.clientX - drag.px) / r.width * 100));
+        bgState.cfg.y = Math.max(0, Math.min(100, drag.y - (e.clientY - drag.py) / r.height * 100));
+        document.getElementById('bgRangeX').value = bgState.cfg.x;
+        document.getElementById('bgRangeY').value = bgState.cfg.y;
+        bgPreviewApply();
+      });
+      var end = function() { drag = null; pv.style.cursor = 'grab'; };
+      pv.addEventListener('pointerup', end);
+      pv.addEventListener('pointercancel', end);
+    }
+    modal.style.display = 'flex';
+    bgSelectSection(BG_SECTIONS[0].id);
+  };
+
+  function injectSectionBgButton() {
+    if (document.getElementById('adminBgBtn')) return;
+    var b = document.createElement('button');
+    b.id = 'adminBgBtn';
+    b.textContent = 'SFONDI SEZIONI';
+    b.onclick = function() { window.openSectionBgEditor(); };
+    b.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:10000;font-family:'Orbitron',sans-serif;font-size:0.62rem;font-weight:700;letter-spacing:0.15em;padding:10px 18px;background:var(--gold);color:var(--black);border:none;cursor:pointer;box-shadow:0 8px 32px rgba(0,0,0,0.7)";
+    document.body.appendChild(b);
+  }
+
+
   injectHeroEditor();
+  injectSectionBgButton();
   injectAdminButtons();
   injectMemberAvatarOverlay();
   injectGuideEditor();
