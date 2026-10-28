@@ -96,7 +96,7 @@ nav {
 @keyframes bounce { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(8px); } }
 .hero-ornament span { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; }
 /* -- HERO IMAGES (free-position) -- */
-#hero-canvas { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, calc(100vh * 16 / 9)); height: min(100%, calc(100vw * 9 / 16)); pointer-events: none; z-index: 2; }
+#hero-canvas { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; pointer-events: none; z-index: 2; }
 .hero-img-wrapper { position: absolute; cursor: default; user-select: none; touch-action: none; z-index: 10; pointer-events: none; }
 .hero-img-wrapper img { width: 100%; height: auto; display: block; border-radius: 4px; pointer-events: none; }
 .hero-img-handle { display: none; position: absolute; width: 14px; height: 14px; background: #c9a84c; border-radius: 50%; z-index: 20; }
