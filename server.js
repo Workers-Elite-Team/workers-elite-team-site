@@ -64,6 +64,20 @@ app.post(['/api/save-photo', '/save-photo'], authenticate, (req, res) => {
   }
 });
 
+// ─── SALVA SFONDO SEZIONE ─────────────────────────────────────────────────────
+app.post(['/api/save-section-bg', '/save-section-bg'], authenticate, (req, res) => {
+  const { sectionId, dataUrl } = req.body;
+  if (!/^[a-z0-9-]+$/.test(sectionId || '') || !dataUrl) return res.status(400).json({ error: 'Dati mancanti' });
+  try {
+    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const name = `bg-${sectionId}-${Date.now()}.jpg`;
+    fs.writeFileSync(path.join(UPLOADS_DIR, name), Buffer.from(base64, 'base64'));
+    res.json({ success: true, url: `/uploads/${name}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── CARICA TUTTE LE FOTO ─────────────────────────────────────────────────────
 app.get(['/api/get-photos', '/get-photos'], (req, res) => {
   try {
